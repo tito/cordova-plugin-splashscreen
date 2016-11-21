@@ -27,10 +27,12 @@ import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Handler;
+import android.os.Build;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
+import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.Animation;
 import android.view.animation.AlphaAnimation;
@@ -43,8 +45,11 @@ import android.widget.RelativeLayout;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CordovaWebView;
+import org.apache.cordova.LOG;
 import org.json.JSONArray;
 import org.json.JSONException;
+
+import com.ninchanese.app.R;
 
 public class SplashScreen extends CordovaPlugin {
     private static final String LOG_TAG = "SplashScreen";
@@ -306,7 +311,7 @@ public class SplashScreen extends CordovaPlugin {
                 }
 
                 // Create and show the dialog
-                splashDialog = new Dialog(context, android.R.style.Theme_Translucent_NoTitleBar);
+                splashDialog = new Dialog(context, R.style.NinchaneseSplashTheme);
                 // check to see if the splash screen should be full screen
                 if ((cordova.getActivity().getWindow().getAttributes().flags & WindowManager.LayoutParams.FLAG_FULLSCREEN)
                         == WindowManager.LayoutParams.FLAG_FULLSCREEN) {
@@ -316,6 +321,7 @@ public class SplashScreen extends CordovaPlugin {
                 splashDialog.setContentView(splashImageView);
                 splashDialog.setCancelable(false);
                 splashDialog.show();
+                setStatusBarBackgroundColor(preferences.getString("StatusBarBackgroundColor", "#ff00ff"));
 
                 if (preferences.getBoolean("ShowSplashScreenSpinner", true)) {
                     spinnerStart();
@@ -381,5 +387,25 @@ public class SplashScreen extends CordovaPlugin {
                 }
             }
         });
+    }
+
+    private void setStatusBarBackgroundColor(final String colorPref) {
+        if (Build.VERSION.SDK_INT >= 21) {
+            if (colorPref != null && !colorPref.isEmpty()) {
+                final Window window = cordova.getActivity().getWindow();
+                // Method and constants not available on all SDKs but we want to be able to compile this code with any SDK
+                window.clearFlags(0x04000000); // SDK 19: WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+                window.addFlags(0x80000000); // SDK 21: WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                try {
+                    // Using reflection makes sure any 5.0+ device will work without having to compile with SDK level 21
+                    window.getClass().getDeclaredMethod("setStatusBarColor", int.class).invoke(window, Color.parseColor(colorPref));
+                } catch (IllegalArgumentException ignore) {
+                    LOG.e(LOG_TAG, "Invalid hexString argument, use f.i. '#999999'");
+                } catch (Exception ignore) {
+                    // this should not happen, only in case Android removes this method in a version > 21
+                    LOG.w(LOG_TAG, "Method window.setStatusBarColor not found for SDK level " + Build.VERSION.SDK_INT);
+                }
+            }
+        }
     }
 }
